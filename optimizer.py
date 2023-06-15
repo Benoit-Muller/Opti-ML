@@ -4,6 +4,10 @@ from torchvision import models
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm,trange
+import sys
+sys.path.insert(0,'/content/drive/MyDrive/Opti-ML') #to access other files
+sys.path.insert(0,"adahessian/image_classification/")
+from optim_adahessian import Adahessian
 
 def set_parameter_requires_grad(model, req_grad):
     if not req_grad:
