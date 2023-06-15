@@ -2,6 +2,7 @@ import torch
 import copy
 from torchvision import models
 import torch.nn as nn
+import torch.optim as optim
 from tqdm import tqdm,trange
 
 def set_parameter_requires_grad(model, req_grad):
@@ -47,7 +48,8 @@ def train_epoch(model, trainloader, criterion, optimizer,device='cpu'):
   print('Train Loss: {:.4f}'.format(epoch_loss))
   return epoch_loss
 
-def test_loss(model, testloader, criterion, optimizer, epoch, num_epoch, best_loss, best_model_wts,savepath,device):
+def test_loss(model, testloader, criterion, optimizer, epoch, num_epoch,device):
+    #model, testloader, criterion, optimizer, epoch, num_epoch, best_loss, best_model_wts,savepath,fold,device
     #compute the loss on a test set
     model.eval()
     running_loss = 0.0
@@ -62,17 +64,17 @@ def test_loss(model, testloader, criterion, optimizer, epoch, num_epoch, best_lo
         optimizer.zero_grad()
 
         with torch.set_grad_enabled(False):
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+          outputs = model(inputs)
+          loss = criterion(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)
-    epoch_loss = running_loss / len(testloader.dataset)
-    print('Test Loss: {:.4f}'.format(epoch_loss))
-    if(epoch_loss < best_loss and epoch > num_epoch/2): #save the best model
-        best_loss = epoch_loss
-        best_model_wts = copy.deepcopy(model.state_dict())
-        torch.save(best_model_wts, savepath)
-    return epoch_loss, best_loss, best_model_wts
+    epoch_loss = 4 * running_loss / len(testloader.dataset)
+    print('Validation Loss: {:.4f}'.format(epoch_loss))
+    #if(epoch_loss < best_loss and epoch > num_epoch/2): #save the best model
+        #best_loss = epoch_loss
+        #best_model_wts = copy.deepcopy(model.state_dict())
+        #torch.save(best_model_wts, f'{savepath}_fold{fold}.pt')
+    return epoch_loss
 
 def train_get_acc(model, trainloader, device):
     model.eval()
@@ -100,38 +102,72 @@ def train_get_acc(model, trainloader, device):
     acc = num_cor / num_all
     return acc
 
-def train_and_test(model, trainloader,testloader, criterion, optimizer,scheduler,num_epoch,savepath,device='cpu'):
+def train_and_test(model,traindataset,batch_size,kfold,criterion,optimizer_name,scheduler,num_epoch,savepath,use_pretrained,lr,betas,momentum,weight_decay,hessian_power,device='cpu'):
     #train and test for each epoch
     #trainloader is a Dataloader
     train_loss=[]
     train_acc_list=[]
-    test_acc_list=[]
-    list_testloss=[]
-    lowest_loss = 100000
-    model_weights = None
-    for epoch in trange(num_epoch):
-        #if(epoch%5==1):
-        print('Epoch {}/{}'.format(epoch, num_epoch-1))
-        print('-' * 10)
-        
-        trainloss=train_epoch(model, trainloader, criterion, optimizer, device)
-        train_acc=train_get_acc(model, trainloader, device)
-        
-        testloss,lowest_loss, model_weights = test_loss(model, testloader, criterion, optimizer, epoch, num_epoch, lowest_loss, model_weights,savepath,device)
-        test_acc=train_get_acc(model, testloader, device)
-        
-        print('Train accuracy: {:.4f}'.format(train_acc))
-        print('Test accuracy: {:.4f}'.format(test_acc))
+    val_acc_list=[]
+    val_loss=[]
+    #lowest_loss = 100000
+    #model_weights = None
+    best_val_acc = []
+    for fold, (train_ids, val_ids) in enumerate(kfold.split(traindataset)):
+        print(f'FOLD {fold}')
+        print('--------------------------------')
+        train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+        val_subsampler = torch.utils.data.SubsetRandomSampler(val_ids)
+        trainloader = torch.utils.data.DataLoader(traindataset, batch_size=batch_size, sampler=train_subsampler)
+        valloader = torch.utils.data.DataLoader(traindataset, batch_size=batch_size, sampler=val_subsampler)
+        model, input_size = initialize_model(use_pretrained=use_pretrained)
+        model = model.to(device)
+        if optimizer_name == 'adahessian':
+          optimizer = Adahessian(model.parameters(), lr=lr, betas=betas, weight_decay=weight_decay,hessian_power=hessian_power) #set the parameter
+        elif optimizer_name == 'SGD':
+          optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+        elif optimizer_name == "adam":
+          optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        k_train_loss=[]
+        k_train_acc_list=[]
+        k_val_acc_list=[]
+        k_val_loss=[]
+        k_best_val_acc=0
+        for epoch in trange(num_epoch):
+            #if(epoch%5==1):
+            print('Epoch {}/{}'.format(epoch, num_epoch-1))
+            print('-' * 10)
             
-        train_loss.append(trainloss)
-        train_acc_list.append(train_acc)
-        test_acc_list.append(test_acc)
-        list_testloss.append(testloss)
+            trainloss=train_epoch(model, trainloader, criterion, optimizer, device)
+            train_acc=train_get_acc(model, trainloader, device)
+            
+            valloss=test_loss(model, valloader, criterion, optimizer, epoch, num_epoch,device)
+            val_acc=train_get_acc(model, valloader, device)
+            if(val_acc > k_best_val_acc and epoch > num_epoch/2):
+                k_best_val_acc = val_acc
+                torch.save(model.state_dict(), f'{savepath}_fold{fold}.pt')
+            
+            print('Train accuracy: {:.4f}'.format(train_acc))
+            print('Validation accuracy: {:.4f}'.format(val_acc))
+                
+            k_train_loss.append(trainloss)
+            k_train_acc_list.append(train_acc)
+            k_val_acc_list.append(val_acc)
+            k_val_loss.append(valloss)
 
-        if scheduler is not None:
-            scheduler.step()
+            if scheduler is not None:
+                scheduler.step()
+        train_loss.append(k_train_loss)
+        train_acc_list.append(k_train_acc_list)
+        val_acc_list.append(k_val_acc_list)
+        val_loss.append(k_val_loss)
+        best_val_acc.append(k_best_val_acc)
+    best_k = best_val_acc.index(max(best_val_acc))
+    best_train_acc = train_acc_list[best_k]
+    best_train_loss = train_loss[best_k]
+    best_val_loss = val_loss[best_k]
+    best_val_acc = val_acc_list[best_k]
 
-    return train_loss, list_testloss, lowest_loss, model_weights, train_acc_list, test_acc_list
+    return best_k,best_train_loss, best_val_loss, best_train_acc, best_val_acc
 
 def test_model(model,testloader,model_path,device):
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
