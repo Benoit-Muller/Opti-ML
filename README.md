@@ -33,4 +33,4 @@ To get the training results presented in the paper, run the 'train_and_test.ipyn
 
 To get the results presented in the paper from the precomputed models, run the `MeasureSimilarity.ipynb` notebook. Inside, the models to compare can be chosen and it is possible to run the comparaison for two specific models or for a list of them. To obtain the results on the normalization, run the `normalization.ipynb` notebook.
 
-To recompute the models, run the `SGD.ipynb` and the `Adahessian.ipynb` notebooks.
+Functions used in 'train_and_test.ipynb' notebook and `MeasureSimilarity.ipynb` notebook are defined in optimizer.py
