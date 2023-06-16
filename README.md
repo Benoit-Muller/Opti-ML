@@ -15,15 +15,16 @@ To run the code of this project, you need to install the libraries listed here:
 - torchvision
 - tqdm
 
-The following two libraries can also be installed inside the notebooks:
+The following libraries can also be installed inside the notebooks:
 - torch_cka (https://github.com/AntixK/PyTorch-Model-Compare/tree/main)
 - anatome through the command : `pip install -U git+https://github.com/moskomule/anatome` (https://github.com/moskomule/anatome/tree/master)
+- adahessian (https://github.com/amirgholami/adahessian/tree/master)
 
 ## Folders
 - [`model_weights`](model_weights) contains the computed models
 - [`graphics`](graphics) all the graphics obtained
 - [`loss_and_acc`](loss_and_acc) the loss and accuracy obtained at each epochs during the training
-- 
+
 ## Run
 The runnable files are the `.ipynb` python notebooks files, and are adapted to be runned on Google Colab. The paths are set such that the content of this git is in a folder named `Opti-ML` in the root of Drive.
 
