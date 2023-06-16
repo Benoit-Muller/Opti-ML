@@ -26,6 +26,7 @@ The following two libraries can also be installed inside the notebooks:
 - 
 ## Run
 The runnable files are the `.ipynb` python notebooks files, and are adapted to be runned on Google Colab. The paths are set such that the content of this git is in a folder named `Opti-ML` in the root of Drive.
-To get the results presented in the paper from the precomputed models, run the `MesureSimilarity.ipynb` notebook. Inside, the models to compare can be chosen and it is possible to run the comparaison for two specific models or for a list of them. To obtain the results on the normalization, run the `normalization.ipynb` notebook.
+To get the training results presented in the paper, run the 'train_and_test.ipynb' notebook. All of the parameters can be modified to train. One can choose to use the pretrained version of ResNet18 or initialize the weight with a seed. Changing the optimizer_name to 'SGD' 'adahessian' or 'adam' to train with different optimizers. The end of the notebook has some visualized result of our best model. The path to best model is included in the notebook.
+To get the results presented in the paper from the precomputed models, run the `MeasureSimilarity.ipynb` notebook. Inside, the models to compare can be chosen and it is possible to run the comparaison for two specific models or for a list of them. To obtain the results on the normalization, run the `normalization.ipynb` notebook.
 
 To recompute the models, run the `SGD.ipynb` and the `Adahessian.ipynb` notebooks.
